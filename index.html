@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Anzuelo</title>
+<style>
+:root{--bg:#0c1016;--fg:#e8e4da;--mut:#8a8f98;--acc:#d63a2f;--line:#232a36;--card:#f7f4ec}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;overflow:hidden;touch-action:none}
+.screen{position:fixed;inset:0;padding:calc(env(safe-area-inset-top,0px) + 28px) 24px calc(env(safe-area-inset-bottom,0px) + 28px);display:none;overflow-y:auto;touch-action:pan-y}
+.screen.on{display:block}
+h1{font-size:2.4rem;margin:0 0 4px;font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--mut);margin:0 0 28px;font-style:italic}
+label{display:block;color:var(--mut);font-size:.9rem;margin:18px 0 6px}
+input,select,button{font:inherit;color:var(--fg);background:#141a23;border:1px solid var(--line);border-radius:10px;padding:13px 14px;width:100%;-webkit-user-select:text;user-select:text}
+button{background:var(--acc);border-color:var(--acc);font-weight:700;margin-top:22px;cursor:pointer}
+button.sec{background:transparent;border-color:var(--line);color:var(--fg);font-weight:400}
+button.sm{width:auto;margin:0;padding:7px 11px;font-size:.85rem}
+.err{color:#ff8b80;min-height:1.3em;margin-top:12px;font-size:.95rem}
+.help{color:var(--mut);font-size:.92rem;line-height:1.55;margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+.help b{color:var(--fg)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.user{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
+.user .n{flex:1;min-width:0}.user .n small{display:block;color:var(--mut)}
+.off{opacity:.45}
+/* escenario */
+#stage{background:#000;padding:0;overflow:hidden;touch-action:none}
+.cardwrap{position:absolute;left:50%;width:min(62vw,280px);aspect-ratio:5/7;perspective:1000px}
+#rig{top:11vh;margin-left:calc(min(62vw,280px)/-2);transform:translateY(120vh)}
+#hook{position:absolute;width:34px;height:60px;left:50%;margin-left:-17px;top:-66px}
+#hookDrop{position:absolute;left:50%;width:34px;height:60px;margin-left:-17px;top:-70px;display:none}
+#hook svg,#hookDrop svg{width:100%;height:100%}
+#flip{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,.7,.2,1)}
+#flip.f{transform:rotateY(180deg)}
+.face,.back{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.face{background:var(--card);transform:rotateY(180deg);border:1px solid #cfc9b8}
+.back{background:#1d2b53}
+#paint{width:100%;height:100%;display:block;touch-action:none}
+.corner{position:absolute;font-weight:700;line-height:1;text-align:center;font-size:clamp(26px,9vw,42px)}
+.corner span{display:block;font-size:.8em}
+.tl{left:9px;top:8px}.br{right:9px;bottom:8px;transform:rotate(180deg)}
+.big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(90px,34vw,160px)}
+#brush{position:fixed;width:56px;height:56px;pointer-events:none;display:none;z-index:5;transform:translate(-8px,-48px)}
+@media (prefers-reduced-motion:reduce){#flip{transition-duration:.01s}}
+</style>
+</head>
+<body>
+
+<!-- Acceso -->
+<section id="login" class="screen">
+  <h1>Anzuelo</h1>
+  <p class="sub">Acceso por código personal.</p>
+  <label for="code">Tu código</label>
+  <input id="code" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="Ej. K7M2QX">
+  <button id="enter">Entrar</button>
+  <div class="err" id="loginErr"></div>
+</section>
+
+<!-- Menú -->
+<section id="menu" class="screen">
+  <h1>Anzuelo</h1>
+  <p class="sub">Menú secreto · por Hubanel Rivas</p>
+  <label>Palo de la carta forzada</label>
+  <select id="suit">
+    <option value="♠">Picas ♠</option><option value="♥">Corazones ♥</option>
+    <option value="♦">Diamantes ♦</option><option value="♣">Tréboles ♣</option>
+  </select>
+  <label>Valor</label>
+  <select id="val"></select>
+  <p class="sub" style="margin:18px 0 0">Esta carta saldrá del teléfono.</p>
+  <button id="go">Listo, poner pantalla negra</button>
+  <button class="sec" id="logout">Cerrar sesión</button>
+  <div class="help">
+    <b>Cómo se usa.</b> Pon el teléfono boca arriba con el borde de abajo pegado al mazo.<br>
+    <b>1.er toque:</b> el gancho baja, se mete en el mazo y sube jalando una carta boca abajo.<br>
+    <b>2.º toque:</b> la carta se da vuelta y muestra la carta forzada.<br>
+    <b>3.er toque:</b> la carta vuelve a ponerse boca abajo.<br>
+    El espectador toca la carta: aparece una brocha que pinta el dorso de rojo al mover el dedo. Cuando ya está casi toda roja, <b>1 toque</b>: se da vuelta y muestra la cara. Luego <b>2 toques rápidos</b>: la carta baja y se mete al mazo.<br>
+    <b>Mantén presionado 1,5 s</b> en cualquier parte para volver a este menú.
+  </div>
+</section>
+
+<!-- Escenario -->
+<section id="stage" class="screen">
+  <div id="hookDrop"></div>
+  <div id="rig" class="cardwrap">
+    <div id="hook"></div>
+    <div id="flip">
+      <div class="back"><canvas id="paint"></canvas></div>
+      <div class="face" id="face"></div>
+    </div>
+  </div>
+</section>
+<div id="brush"></div>
+
+<!-- Panel del dueño -->
+<section id="admin" class="screen">
+  <h1>Panel</h1>
+  <p class="sub">Solo para el dueño.</p>
+  <div id="adminLogin">
+    <label>Correo</label><input id="aMail" type="email" autocomplete="username">
+    <label>Contraseña</label><input id="aPass" type="password" autocomplete="current-password">
+    <button id="aIn">Entrar al panel</button>
+    <div class="err" id="aErr"></div>
+  </div>
+  <div id="adminMain" style="display:none">
+    <label>Nombre del nuevo usuario</label>
+    <div class="row"><input id="uName" placeholder="Ej. Carlos"><button class="sm" id="uAdd" style="flex:0 0 110px;margin:0">Crear código</button></div>
+    <div class="err" id="mErr"></div>
+    <div id="list"></div>
+    <button class="sec" id="aOut">Salir del panel</button>
+  </div>
+</section>
+
+<script>
+/* ===== CONFIGURACIÓN: pega aquí los datos de tu proyecto de Firebase ===== */
+const CFG={apiKey:"PEGA_TU_API_KEY",projectId:"PEGA_TU_PROJECT_ID"};
+/* ========================================================================= */
+
+const $=s=>document.querySelector(s);
+const DB=`https://firestore.googleapis.com/v1/projects/${CFG.projectId}/databases/(default)/documents/usuarios`;
+const show=id=>{document.querySelectorAll('.screen').forEach(e=>e.classList.remove('on'));$('#'+id).classList.add('on')};
+const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+
+/* ---------- Acceso por código ---------- */
+async function checkCode(c){
+  try{
+    const r=await fetch(`${DB}/${encodeURIComponent(c)}`);
+    if(r.status===404)return{ok:false,msg:'Ese código no existe.'};
+    if(!r.ok)return{ok:false,msg:'No se pudo verificar. Revisa tu conexión.'};
+    const d=await r.json();
+    if(d.fields&&d.fields.activo&&d.fields.activo.booleanValue)return{ok:true};
+    return{ok:false,msg:'Este acceso fue revocado.'};
+  }catch(e){return{ok:false,msg:'Sin conexión. Conéctate para entrar.'}}
+}
+async function start(){
+  if(location.hash==='#admin'){show('admin');return}
+  const c=store.get('anz_code');
+  if(!c){show('login');return}
+  const r=await checkCode(c);
+  if(r.ok){show('menu')}else{store.del('anz_code');show('login');$('#loginErr').textContent=r.msg}
+}
+$('#enter').onclick=async()=>{
+  const c=$('#code').value.trim().toUpperCase();
+  if(!c){$('#loginErr').textContent='Escribe tu código.';return}
+  $('#loginErr').textContent='Verificando…';
+  const r=await checkCode(c);
+  if(r.ok){store.set('anz_code',c);show('menu')}else $('#loginErr').textContent=r.msg;
+};
+$('#logout').onclick=()=>{store.del('anz_code');show('login')};
+addEventListener('hashchange',start);
+
+/* ---------- Menú ---------- */
+const VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+VALS.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;$('#val').appendChild(o)});
+$('#val').value=store.get('anz_val')||'7';$('#suit').value=store.get('anz_suit')||'♠';
+
+/* ---------- Sonido ---------- */
+let AC;
+function click(t,f,d,g){const o=AC.createOscillator(),a=AC.createGain();o.type='square';o.frequency.value=f;a.gain.setValueAtTime(g,t);a.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(a).connect(AC.destination);o.start(t);o.stop(t+d)}
+function reel(dur){if(!AC)return;let t=AC.currentTime,e=t+dur,gap=.025;while(t<e){click(t,1800+Math.random()*500,.012,.05);t+=gap;gap*=1.025}}
+function whoosh(){if(!AC)return;const t=AC.currentTime,n=AC.createBufferSource(),b=AC.createBuffer(1,AC.sampleRate*.5,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);n.buffer=b;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.setValueAtTime(600,t);f.frequency.exponentialRampToValueAtTime(3000,t+.45);const g=AC.createGain();g.gain.value=.25;n.connect(f).connect(g).connect(AC.destination);n.start(t)}
+
+/* ---------- Escenario ---------- */
+const HOOK='<svg viewBox="0 0 34 60"><path d="M17 0v38a9 9 0 1 1-9 9" fill="none" stroke="#c9ced6" stroke-width="3" stroke-linecap="round"/><path d="M8 47l-4-6M8 47l5-4" stroke="#c9ced6" stroke-width="3" stroke-linecap="round"/></svg>';
+$('#hook').innerHTML=HOOK;$('#hookDrop').innerHTML=HOOK;
+const rig=$('#rig'),flip=$('#flip'),cv=$('#paint'),ctx=cv.getContext('2d'),brush=$('#brush');
+brush.innerHTML='<svg viewBox="0 0 56 56"><path d="M8 48c0-6 4-9 8-9l3 3c0 4-3 8-11 6z" fill="#d63a2f"/><path d="M19 40L44 8l4 3-24 33z" fill="#b98b4f"/></svg>';
+let phase=0,ready=false,lastTap=0,moves=0,painting=false;
+
+function buildFace(){
+  const v=$('#val').value,s=$('#suit').value,col=(s==='♥'||s==='♦')?'#c62828':'#16181d';
+  $('#face').style.color=col;
+  $('#face').innerHTML=`<div class="corner tl">${v}<span>${s}</span></div><div class="big">${s}</div><div class="corner br">${v}<span>${s}</span></div>`;
+}
+function resetBack(){
+  const w=cv.width=420,h=cv.height=588;
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle='#1d2b53';ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,.13)';ctx.lineWidth=2;
+  for(let i=-h;i<w;i+=28){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+h,h);ctx.stroke();ctx.beginPath();ctx.moveTo(i+h,0);ctx.lineTo(i,h);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=6;ctx.strokeRect(16,16,w-32,h-32);
+}
+function resetStage(){
+  phase=0;ready=false;painting=false;moves=0;
+  buildFace();resetBack();
+  flip.style.transition='none';flip.classList.remove('f');void flip.offsetWidth;flip.style.transition='';
+  rig.style.transition='none';rig.style.transform='translateY(120vh)';
+  $('#hookDrop').style.display='none';brush.style.display='none';
+}
+$('#go').onclick=()=>{
+  store.set('anz_val',$('#val').value);store.set('anz_suit',$('#suit').value);
+  try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume()}catch(e){}
+  resetStage();show('stage');
+  if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});
+};
+
+function step1(){ /* gancho baja, entra al mazo y sube con la carta */
+  const hd=$('#hookDrop');hd.style.display='block';hd.style.transition='none';hd.style.transform='translateY(0)';void hd.offsetWidth;
+  reel(0.9);hd.style.transition='transform .8s ease-in';hd.style.transform='translateY(110vh)';
+  setTimeout(()=>{hd.style.display='none';whoosh();reel(1.1);
+    rig.style.transition='transform 1.2s cubic-bezier(.2,.8,.25,1)';rig.style.transform='translateY(0)'},850);
+}
+function tap(){
+  const now=Date.now();
+  if(phase===0){phase=1;step1()}
+  else if(phase===1){phase=2;flip.classList.add('f')}
+  else if(phase===2){phase=3;flip.classList.remove('f')}
+  else if(phase===4&&ready){phase=5;flip.classList.add('f')}
+  else if(phase===5){if(now-lastTap<380){phase=6;rig.style.transition='transform .9s ease-in';rig.style.transform='translateY(120vh)';whoosh()}}
+  lastTap=now;
+}
+
+/* gestos del escenario */
+let down=null,lp=null;
+const st=$('#stage');
+function inCard(x,y){const r=rig.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom}
+function coverage(){
+  const w=cv.width,h=cv.height,d=ctx.getImageData(0,0,w,h).data;let red=0,n=0;
+  for(let y=30;y<h-30;y+=12)for(let x=30;x<w-30;x+=12){const i=(y*w+x)*4;n++;if(d[i]>170&&d[i+1]<90)red++}
+  return red/n;
+}
+function paintAt(x,y){
+  const r=cv.getBoundingClientRect(),px=(x-r.left)*cv.width/r.width,py=(y-r.top)*cv.height/r.height;
+  ctx.fillStyle='#d32f2f';ctx.beginPath();ctx.arc(px,py,34,0,7);ctx.fill();
+  if(++moves%12===0&&coverage()>.88){ready=true;phase=4}
+}
+st.addEventListener('pointerdown',e=>{
+  down={x:e.clientX,y:e.clientY,t:Date.now(),moved:false};
+  if(phase===3&&inCard(e.clientX,e.clientY)){painting=true;brush.style.display='block'}
+  if(painting){brush.style.left=e.clientX+'px';brush.style.top=e.clientY+'px';paintAt(e.clientX,e.clientY)}
+  clearTimeout(lp);lp=setTimeout(()=>{if(down&&!down.moved){down=null;painting=false;show('menu');if(document.fullscreenElement)document.exitFullscreen()}},1500);
+});
+st.addEventListener('pointermove',e=>{
+  if(!down)return;
+  if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>22){down.moved=true;clearTimeout(lp)}
+  if(painting&&phase===3){brush.style.left=e.clientX+'px';brush.style.top=e.clientY+'px';paintAt(e.clientX,e.clientY)}
+});
+function up(){
+  clearTimeout(lp);if(!down)return;
+  const quick=Date.now()-down.t<450&&!down.moved,was=painting;
+  painting=false;
+  if(quick&&!(was&&phase===3))tap();
+  else if(quick&&was&&phase===3&&moves<4){/* toque corto sobre la carta: solo brocha */}
+  down=null;
+}
+st.addEventListener('pointerup',up);st.addEventListener('pointercancel',()=>{clearTimeout(lp);down=null;painting=false});
+st.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* ---------- Panel del dueño ---------- */
+let TOKEN=null;
+async function adminFetch(url,opt={}){opt.headers=Object.assign({Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'},opt.headers||{});const r=await fetch(url,opt);if(!r.ok)throw new Error(r.status);return r.status===200?r.json():null}
+$('#aIn').onclick=async()=>{
+  $('#aErr').textContent='Entrando…';
+  try{
+    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${CFG.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#aMail').value.trim(),password:$('#aPass').value,returnSecureToken:true})});
+    const d=await r.json();if(!d.idToken)throw 0;
+    TOKEN=d.idToken;$('#adminLogin').style.display='none';$('#adminMain').style.display='block';$('#aPass').value='';loadUsers();
+  }catch(e){$('#aErr').textContent='Correo o contraseña incorrectos.'}
+};
+$('#aOut').onclick=()=>{TOKEN=null;$('#adminMain').style.display='none';$('#adminLogin').style.display='block';$('#aErr').textContent=''};
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function loadUsers(){
+  try{
+    const d=await adminFetch(DB+'?pageSize=300');const docs=(d&&d.documents)||[];
+    $('#list').innerHTML=docs.length?'':'<p class="sub">Aún no hay usuarios. Crea el primero arriba.</p>';
+    docs.forEach(x=>{
+      const id=x.name.split('/').pop(),f=x.fields||{},on=f.activo&&f.activo.booleanValue,nom=(f.nombre&&f.nombre.stringValue)||'';
+      const row=document.createElement('div');row.className='user'+(on?'':' off');
+      row.innerHTML=`<div class="n">${esc(nom)}<small>${esc(id)} · ${on?'activo':'revocado'}</small></div>`;
+      const b1=document.createElement('button');b1.className='sm sec';b1.textContent=on?'Revocar':'Reactivar';
+      b1.onclick=async()=>{await adminFetch(`${DB}/${id}?updateMask.fieldPaths=activo`,{method:'PATCH',body:JSON.stringify({fields:{activo:{booleanValue:!on}}})});loadUsers()};
+      const b2=document.createElement('button');b2.className='sm sec';b2.textContent='Borrar';
+      b2.onclick=async()=>{if(confirm('¿Borrar a '+nom+'?')){await adminFetch(`${DB}/${id}`,{method:'DELETE'});loadUsers()}};
+      row.append(b1,b2);$('#list').appendChild(row);
+    });
+  }catch(e){$('#mErr').textContent='No se pudo cargar la lista.'}
+}
+$('#uAdd').onclick=async()=>{
+  const n=$('#uName').value.trim();if(!n)return;
+  const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',code=Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>A[b%A.length]).join('');
+  try{
+    await adminFetch(`${DB}/${code}`,{method:'PATCH',body:JSON.stringify({fields:{nombre:{stringValue:n},activo:{booleanValue:true}}})});
+    $('#uName').value='';$('#mErr').textContent='Código creado para '+n+': '+code;loadUsers();
+  }catch(e){$('#mErr').textContent='No se pudo crear el usuario.'}
+};
+
+start();
+</script>
+</body>
+</html>
